@@ -88,7 +88,7 @@ Create a file called `.env` in the project folder with:
 ```
 STEAMDECK_HOST
 STEAMDECK_USER
-STEAMDECK_PASS
+STEAMDECK_PASSWORD
 LOG_DIR=logs
 GEMINI_API_KEY
 ```
