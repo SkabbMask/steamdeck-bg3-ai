@@ -104,7 +104,7 @@ class AIClient:
         )
         return response.text.strip()
 
-    def ask_model_action(self, image_bytes: bytes, summary: str, recent_actions: list, nudge: bool = False) -> dict:
+    def ask_model_action(self, image_bytes: bytes, summary: str, recent_actions: list, feedback: str | None = None, nudge: bool = False) -> dict:
         b64 = base64.b64encode(image_bytes).decode("utf-8")
 
         context_parts = []
@@ -117,7 +117,10 @@ class AIClient:
                 "WARNING: You have been clicking the same spot repeatedly with no result. "
                 "Try a completely different action or location."
             )
+        if feedback:
+            context_parts.append("HUMAN OPERATOR FEEDBACK: " + feedback)
         context = "\n\n".join(context_parts) + "\n\nDecide the single best action to take."
+        log.info("Prompt: " + context)
 
         response = self.client.models.generate_content(
             model=self.action_model,

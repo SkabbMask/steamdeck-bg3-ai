@@ -83,3 +83,14 @@ def is_stuck(loop_detect_window, all_actions: list) -> bool:
         return len(set(coords)) == 1
     except Exception:
         return False
+
+def read_and_clear_feedback(feedback) -> str | None:
+    if not feedback.exists():
+        return None
+    
+    content = feedback.read_text().strip()
+    if not content:
+        return None
+    
+    feedback.write_text("")
+    return content

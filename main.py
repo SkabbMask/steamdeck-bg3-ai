@@ -59,9 +59,12 @@ def main():
             # 5. Build recent actions window
             recent_actions = all_actions[-config.RECENT_ACTIONS_KEEP:]
 
+            # Check human feedback
+            feedback = utils.read_and_clear_feedback(config.FEEDBACK_FILE)
+
             # 6. Ask model for action
             log.info("Sending to model...")
-            action = ai.ask_model_action(resized_bytes, summary, recent_actions, nudge)
+            action = ai.ask_model_action(resized_bytes, summary, recent_actions, feedback, nudge)
             log.info(f"Action: {action}")
 
             # 7. Execute action
