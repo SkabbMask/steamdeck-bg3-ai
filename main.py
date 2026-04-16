@@ -18,7 +18,7 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 deck = SteamdeckClient(config.STEAMDECK_HOST, config.STEAMDECK_USER, config.STEAMDECK_PASSWORD, config.REMOTE_SCREENSHOT_PATH, config.LOCAL_SCREENSHOT_PATH, config.OVERLAY_REMOTE_PATH)
-ai = AIClient(config.GEMINI_API_KEY, config.ACTION_MODEL, config.SUMMARY_MODEL)
+ai = AIClient(config.MODEL_URL, config.MODEL_TYPE, config.API_KEY, config.ACTION_MODEL, config.SUMMARY_MODEL)
 
 def main():
     log.info("Starting BG3 agent...")
@@ -61,6 +61,8 @@ def main():
 
             # Check human feedback
             feedback = utils.read_and_clear_feedback(config.FEEDBACK_FILE)
+            if feedback:
+                log.info("Got human feedback: " + feedback)
 
             # 6. Ask model for action
             log.info("Sending to model...")

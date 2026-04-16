@@ -1,9 +1,11 @@
 import base64
 from google import genai
 from google.genai import types
+import requests
 import logging
 import re
 import json
+from typing import Literal
 
 log = logging.getLogger(__name__)
 
@@ -76,8 +78,14 @@ New actions:
 """
 
 class AIClient:
-    def __init__(self, api_key: str, action_model: str, summary_model: str):
-        self.client = genai.Client(api_key=api_key)
+    def __init__(self, url: str, model_type: Literal['llamacpp','gemini'], api_key: str | None, action_model: str, summary_model: str):
+        assert model_type in ("llamacpp", "gemini"), f"Unknown model_type: {model_type}"
+        log.info("Initializing AI client with model type " + model_type)
+        log.info("url: " + url)
+        self.url = url
+        self.model_type = model_type
+        if model_type == 'gemini':
+            self.client = genai.Client(api_key=api_key)
         self.action_model = action_model
         self.summary_model = summary_model
 
@@ -88,25 +96,59 @@ class AIClient:
             previous_summary=previous_summary or "None yet.",
             new_actions="\n".join(new_actions),
         )
-
-        response = self.client.models.generate_content(
-            model=self.summary_model,
-            config=types.GenerateContentConfig(
-                system_instruction=SYSTEM_PROMPT_SUMMARY,
-            ),
-            contents=[
-                types.Part.from_bytes(
-                    data=b64,
-                    mime_type='image/jpeg',
+        log.info("Summary prompt: " + prompt)
+        if self.model_type == 'llamacpp':
+            log.info("Calling " + self.url)
+            response = requests.post(
+                self.url,
+                json={
+                    "model": self.summary_model,
+                    "messages": [
+                        {"role": "system", "content": SYSTEM_PROMPT_SUMMARY},
+                        {
+                            "role": "user",
+                            "content": [
+                                {
+                                    "type": "image_url",
+                                    "image_url": {
+                                        "url": f"data:image/jpeg;base64,{b64}"
+                                    }
+                                },
+                                {
+                                    "type": "text",
+                                    "text": prompt
+                                }
+                            ]
+                        }
+                    ],
+                    "max_tokens": 1024,
+                }
+            )
+            json_response = response.json()
+            if "choices" in json_response:
+                json_summary = json_response["choices"][0]["message"]["content"]
+                return json_summary.strip()
+            else:
+                log.error(json_response)
+                return None
+        elif self.model_type == 'gemini':
+            log.info("Calling gemini")
+            response = self.client.models.generate_content(
+                model=self.summary_model,
+                config=types.GenerateContentConfig(
+                    system_instruction=SYSTEM_PROMPT_SUMMARY,
                 ),
-                prompt,
-            ]
-        )
-        return response.text.strip()
+                contents=[
+                    types.Part.from_bytes(
+                        data=b64,
+                        mime_type='image/jpeg',
+                    ),
+                    prompt,
+                ]
+            )
+            return response.text.strip()
 
     def ask_model_action(self, image_bytes: bytes, summary: str, recent_actions: list, feedback: str | None = None, nudge: bool = False) -> dict:
-        b64 = base64.b64encode(image_bytes).decode("utf-8")
-
         context_parts = []
         if summary:
             context_parts.append(f"Progress so far: {summary}")
@@ -120,27 +162,68 @@ class AIClient:
         if feedback:
             context_parts.append("HUMAN OPERATOR FEEDBACK: " + feedback)
         context = "\n\n".join(context_parts) + "\n\nDecide the single best action to take."
-        log.info("Prompt: " + context)
+        log.info("Action prompt: " + context)
 
-        response = self.client.models.generate_content(
-            model=self.action_model,
-            config=types.GenerateContentConfig(
-                system_instruction=SYSTEM_PROMPT_ACTION,
-            ),
-            contents=[
-              types.Part.from_bytes(
-                data=b64,
-                mime_type='image/jpeg',
-              ),
-              context,
-            ]
-        )
+        b64 = base64.b64encode(image_bytes).decode("utf-8")
+        if self.model_type == 'llamacpp':
+            log.info("Calling " + self.url)
+            response = requests.post(
+                self.url,
+                json={
+                    "model": self.action_model,
+                    "messages": [
+                        {"role": "system", "content": SYSTEM_PROMPT_ACTION},
+                        {
+                            "role": "user",
+                            "content": [
+                                {
+                                    "type": "image_url",
+                                    "image_url": {
+                                        "url": f"data:image/jpeg;base64,{b64}"
+                                    }
+                                },
+                                {
+                                    "type": "text",
+                                    "text": context
+                                }
+                            ]
+                        }
+                    ],
+                    "max_tokens": 1024,
+                }
+            )
+            json_response = response.json()
+            if "choices" in json_response:
+                json_action = json_response["choices"][0]["message"]["content"]
+                try:
+                    return json.loads(json_action)
+                except Exception as e:
+                    log.error(f"Action wasn't json: {e}", exc_info=True)
+                    return None
+            else:
+                log.error(json_response)
+                return None
+        elif self.model_type == 'gemini':
+            log.info("Calling gemini")
+            response = self.client.models.generate_content(
+                model=self.action_model,
+                config=types.GenerateContentConfig(
+                    system_instruction=SYSTEM_PROMPT_ACTION,
+                ),
+                contents=[
+                  types.Part.from_bytes(
+                    data=b64,
+                    mime_type='image/jpeg',
+                  ),
+                  context,
+                ]
+            )
 
-        raw = response.text.strip()
-        log.debug(f"Raw model response: {raw}")
+            raw = response.text.strip()
+            log.debug(f"Raw model response: {raw}")
 
-        match = re.search(r'\{.*\}', raw, re.DOTALL)
-        if not match:
-            raise ValueError(f"No JSON found in response: {raw}")
-        return json.loads(match.group())
+            match = re.search(r'\{.*\}', raw, re.DOTALL)
+            if not match:
+                raise ValueError(f"No JSON found in response: {raw}")
+            return json.loads(match.group())
 

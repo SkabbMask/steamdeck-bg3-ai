@@ -22,6 +22,13 @@ OVERLAY_REMOTE_PATH    = "/tmp/bg3_overlay.txt"
 STATE_FILE = LOG_DIR / "state.json"
 FEEDBACK_FILE = Path("feedback.txt")
 
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-ACTION_MODEL  = "gemini-3-flash-preview"
-SUMMARY_MODEL = "gemini-3-flash-preview"
+MODEL_TYPE="llamacpp" # llamacpp | gemini
+MODEL_URL=os.getenv("MODEL_URL")
+
+#API_KEY = os.getenv("GEMINI_API_KEY")
+#ACTION_MODEL  = "gemini-3-flash-preview"
+#SUMMARY_MODEL = "gemini-3-flash-preview"
+
+API_KEY = ""
+ACTION_MODEL  = "qwen3.5-35b"
+SUMMARY_MODEL = "qwen3.5-35b"
