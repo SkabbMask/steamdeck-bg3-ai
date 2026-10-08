@@ -103,7 +103,7 @@ GEMINI_API_KEY
 
 ### 2. Start the agent on your PC
 ```powershell
-python bg3_agent.py
+python main.py
 ```
 
 The agent will:
